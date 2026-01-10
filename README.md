@@ -148,6 +148,7 @@ Results are saved in `outputs/{timestamp}/`:
 - **attempts.parquet**: Detailed log of all attempts with answers
 - **times.parquet**: Timing statistics
 - **metrics.json**: Final metrics (Pass@1, Maj@k, etc.)
+- **config.json**: Run configuration snapshot (API key masked; includes solver type)
 
 ### 🎓 Metrics Explained
 
@@ -326,6 +327,7 @@ cfg = CFG(
 - **attempts.parquet**: 所有尝试的详细日志
 - **times.parquet**: 时间统计数据
 - **metrics.json**: 最终指标（Pass@1、Maj@k 等）
+- **config.json**: 运行配置快照（屏蔽敏感字段，包含 `solver` 类型）
 
 ### 🎓 指标说明
 
