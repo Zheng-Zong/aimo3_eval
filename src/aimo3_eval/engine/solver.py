@@ -33,7 +33,7 @@ PYTHON_TOOL = [
     }
 ]
 
-class AIMO3Solver:
+class TIRSolver:
     def __init__(self, cfg: "CFG"):
         self.cfg = cfg
         
@@ -272,3 +272,171 @@ class AIMO3Solver:
                 sb.close()
             except:
                 pass
+
+
+class CoTSolver:
+    """
+    纯 Chain-of-Thought Solver，不使用任何工具。
+    模型直接通过推理得出答案。
+    """
+    
+    def __init__(self, cfg: "CFG"):
+        self.cfg = cfg
+        
+        # 根据模式选择连接地址
+        if self.cfg.mode == 'remote':
+            print(f"🌐 [CoT] Connecting to Remote API: {self.cfg.remote_model_name}")
+            api_key = self.cfg.remote_api_key
+            base_url = self.cfg.remote_base_url
+            self.target_model = self.cfg.remote_model_name
+        else:
+            print(f"🏠 [CoT] Connecting to Local vLLM: {self.cfg.served_model_name}")
+            api_key = "sk-local"
+            base_url = f"http://localhost:{self.cfg.port}/v1"
+            self.target_model = self.cfg.served_model_name
+
+        # 初始化客户端
+        self.client = OpenAI(
+            base_url=base_url,
+            api_key=api_key,
+            timeout=cfg.timeout_per_problem
+        )
+
+    def solve(self, problem: str, problem_id: str) -> Dict[str, Any]:
+        """
+        Orchestrator: 并发执行多次尝试 (Maj@k)
+        """
+        start_time = time.time()
+        attempts_data = []
+        
+        # 并行执行 k 次采样
+        with ThreadPoolExecutor(max_workers=self.cfg.workers) as executor:
+            futures = []
+            for i in range(self.cfg.attempts):
+                futures.append(executor.submit(self._run_single_attempt, problem, i))
+                
+            for future in as_completed(futures):
+                attempts_data.append(future.result())
+
+        # 简单的答案聚合 (Extract Final Answer)
+        valid_answers = [a['final_answer'] for a in attempts_data if a['final_answer'] is not None]
+        
+        # 众数投票 (Majority Vote)
+        if valid_answers:
+            from collections import Counter
+            final_consensus = Counter(valid_answers).most_common(1)[0][0]
+        else:
+            final_consensus = None
+
+        # 计算所有 attempts 的时间统计
+        attempt_times = [a['time_taken'] for a in attempts_data]
+        min_time = min(attempt_times) if attempt_times else 0
+        max_time = max(attempt_times) if attempt_times else 0
+        avg_time = sum(attempt_times) / len(attempt_times) if attempt_times else 0
+
+        return {
+            "id": problem_id,
+            "problem": problem,
+            "final_answer": final_consensus,
+            "attempts": attempts_data,
+            "min_attempt_time": min_time,
+            "max_attempt_time": max_time,
+            "avg_attempt_time": avg_time
+        }
+
+    def _run_single_attempt(self, problem: str, attempt_idx: int) -> Dict[str, Any]:
+        """
+        Core Logic: 单次纯 CoT 推理，不使用工具
+        """
+        attempt_start_time = time.time()
+        
+        messages = [
+            {"role": "system", "content": self.cfg.system_prompt},
+            {"role": "user", "content": problem}
+        ]
+        
+        final_answer = None
+        total_tokens = 0
+        reasoning_content = ""
+        response_content = ""
+        
+        try:
+            # 单次 LLM 调用，不使用工具
+            response = self.client.chat.completions.create(
+                model=self.target_model,
+                messages=messages,
+                temperature=self.cfg.temperature,
+                max_tokens=self.cfg.max_tokens,
+            )
+            message = response.choices[0].message
+            
+            # 累加 tokens
+            if hasattr(response, 'usage') and response.usage:
+                total_tokens = response.usage.total_tokens
+            
+            # 获取推理内容（如果模型支持，如 DeepSeek-R1）
+            if hasattr(message, 'reasoning_content') and message.reasoning_content:
+                reasoning_content = message.reasoning_content
+            
+            # 获取回复内容
+            response_content = message.content or ""
+            
+            # 将模型回复加入历史
+            messages.append(self._normalize_message(message))
+            
+            # 提取答案
+            if "\\boxed{" in response_content:
+                extracted = self._extract_boxed_content(response_content)
+                if extracted:
+                    final_answer = extracted
+                        
+        except Exception as e:
+            print(f"Critical Error in CoT attempt {attempt_idx}: {e}")
+            messages.append({"role": "system", "content": f"Error: {str(e)}"})
+
+        # 清洗 messages 对象
+        clean_messages = []
+        for msg in messages:
+            if hasattr(msg, "model_dump"):
+                clean_messages.append(msg.model_dump())
+            elif hasattr(msg, "to_dict"):
+                clean_messages.append(msg.to_dict())
+            elif isinstance(msg, dict):
+                clean_messages.append(msg)
+            else:
+                try:
+                    clean_messages.append(dict(msg))
+                except:
+                    clean_messages.append({"role": "unknown", "content": str(msg)})
+
+        return {
+            "attempt_id": attempt_idx,
+            "final_answer": final_answer,
+            "messages": clean_messages,
+            "time_taken": time.time() - attempt_start_time,
+            "total_tokens": total_tokens
+        }
+
+    def _extract_boxed_content(self, text: str) -> Optional[str]:
+        """简单的正则提取 \\boxed{} 内容"""
+        matches = re.findall(r'\\boxed\s*\{(.*?)\}', text)
+        if matches:
+            return matches[-1]
+        return None
+
+    def _normalize_message(self, msg: Any) -> Dict[str, Any]:
+        """确保消息为纯 dict"""
+        if hasattr(msg, "model_dump"):
+            return msg.model_dump()
+        if hasattr(msg, "to_dict"):
+            return msg.to_dict()
+        if isinstance(msg, dict):
+            return msg
+        try:
+            return dict(msg)
+        except Exception:
+            return {"role": "unknown", "content": str(msg)}
+
+    def cleanup(self):
+        """CoT Solver 不需要清理资源，但保持接口一致"""
+        pass

@@ -36,6 +36,9 @@ class SolverProtocol(Protocol):
 class ResultRecorder:
     """结果记录器，负责保存和管理评估结果"""
     
+    # 核心字段（必须存在）
+    CORE_ATTEMPT_FIELDS = {'attempt_id', 'final_answer', 'messages', 'time_taken'}
+    
     def __init__(self, output_dir: str):
         self.output_dir = output_dir
         self.attempts_path = os.path.join(output_dir, "attempts.parquet")
@@ -43,6 +46,9 @@ class ResultRecorder:
         
         self.all_attempts: List[Dict[str, Any]] = []
         self.all_times: List[Dict[str, Any]] = []
+        
+        # 动态追踪所有遇到的额外字段
+        self._extra_fields: set = set()
     
     def add_result(
         self,
@@ -54,11 +60,20 @@ class ResultRecorder:
         """
         添加一个问题的求解结果。
         
+        支持不同 Solver 返回不同的额外字段，会自动记录所有字段。
+        
         Args:
             problem_id: 问题 ID
             problem: 问题内容
             ground_truth: 正确答案
-            solve_result: Solver 返回的结果
+            solve_result: Solver 返回的结果，必须包含:
+                - final_answer: 最终答案
+                - attempts: 所有尝试的列表，每个 attempt 必须包含:
+                    - attempt_id: 尝试 ID
+                    - final_answer: 该次尝试的答案
+                    - messages: 消息历史
+                    - time_taken: 耗时
+                - min_attempt_time, max_attempt_time, avg_attempt_time: 时间统计
             
         Returns:
             最终答案是否正确
@@ -71,6 +86,7 @@ class ResultRecorder:
             attempt_answer = str(attempt.get('final_answer', ''))
             attempt_is_correct = MathGrader.is_equiv(attempt_answer, ground_truth) if ground_truth else False
             
+            # 构建基础记录（核心字段）
             attempt_record = {
                 "attempt_id": attempt['attempt_id'],
                 "problem_id": problem_id,
@@ -80,9 +96,14 @@ class ResultRecorder:
                 "ground_truth": ground_truth,
                 "isCorrect": attempt_is_correct,
                 "time": attempt.get('time_taken', 0.0),
-                "python_calls": attempt.get('python_calls', 0),
-                "python_errors": attempt.get('python_errors', 0)
             }
+            
+            # 动态添加额外字段（非核心字段）
+            for key, value in attempt.items():
+                if key not in self.CORE_ATTEMPT_FIELDS:
+                    self._extra_fields.add(key)
+                    attempt_record[key] = value
+            
             self.all_attempts.append(attempt_record)
         
         # 添加时间汇总
@@ -100,6 +121,7 @@ class ResultRecorder:
     def save(self) -> tuple[str, str]:
         """保存所有结果到 parquet 文件"""
         if self.all_attempts:
+            # Polars 会自动处理缺失字段填充为 null
             attempts_df = pl.DataFrame(self.all_attempts)
             attempts_df.write_parquet(self.attempts_path)
         
@@ -108,6 +130,11 @@ class ResultRecorder:
             times_df.write_parquet(self.times_path)
         
         return self.attempts_path, self.times_path
+    
+    @property
+    def extra_fields(self) -> set:
+        """返回记录过程中发现的所有额外字段"""
+        return self._extra_fields.copy()
 
 
 class EvalRunner:
@@ -155,6 +182,20 @@ class EvalRunner:
         
         self.output_dir = os.path.join(cfg.output_dir, run_name)
         os.makedirs(self.output_dir, exist_ok=True)
+        
+        # 保存配置参数（在运行开始时保存，即使中断也能保留配置）
+        # 过滤敏感字段（如 API Key）
+        self.config_path = os.path.join(self.output_dir, "config.json")
+        from dataclasses import asdict
+        config_data = asdict(cfg)
+        sensitive_fields = {'remote_api_key', 'api_key', 'secret', 'password', 'token'}
+        for field in sensitive_fields:
+            if field in config_data:
+                config_data[field] = "***"
+        # 添加 solver 类型信息
+        config_data['solver'] = type(solver).__name__
+        with open(self.config_path, 'w', encoding='utf-8') as f:
+            json.dump(config_data, f, indent=2, ensure_ascii=False)
         
         self.recorder = ResultRecorder(self.output_dir)
     
@@ -251,6 +292,7 @@ class EvalRunner:
                 print(f"\n✅ Final results saved to:")
                 print(f"   - {attempts_path}")
                 print(f"   - {times_path}")
+                print(f"   - {self.config_path}")
             
             # 评估
             if evaluate_after:

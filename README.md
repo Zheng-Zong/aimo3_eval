@@ -1,6 +1,6 @@
-# AIMO3 Eval Framework 🚀
+# AIMO3 Eval 框架 🚀
 
-> 🚧 **Under Construction** | 施工中
+> 适配新版代码的统一评测与运行说明（中文/English）
 
 A lightweight evaluation framework for the Kaggle AIMO3 competition, supporting both **local** and **remote** model inference modes.
 
@@ -74,7 +74,7 @@ export MODEL_PATH="/path/to/model"
 #### 3️⃣ Basic Usage
 
 ```python
-from aimo3_eval import CFG, AIMO3Solver, DataLoader, EvalRunner
+from aimo3_eval import CFG, CoTSolver, TIRSolver, DataLoader, EvalRunner
 
 # Configure
 cfg = CFG(
@@ -86,8 +86,13 @@ cfg = CFG(
     workers=4    # Parallel workers
 )
 
-# Load data
-df = DataLoader.load_csv("data/reference.csv")
+# Load data (map Kaggle's 'answer' to 'ground_truth')
+df = DataLoader.load_csv(
+    "data/reference.csv",
+    id_col="id",
+    problem_col="problem",
+    ground_truth_col="answer",
+)
 # or create custom dataset:
 # df = DataLoader.load_custom_data(
 #     problems=["What is 2+2?"],
@@ -95,8 +100,9 @@ df = DataLoader.load_csv("data/reference.csv")
 #     ground_truths=["4"]
 # )
 
-# Solve and evaluate
-solver = AIMO3Solver(cfg)
+# Solve and evaluate (choose one solver)
+solver = TIRSolver(cfg)
+# solver = CoTSolver(cfg)
 runner = EvalRunner(cfg, solver)
 results = runner.load_data(df).run()
 ```
@@ -239,19 +245,19 @@ pip install -e .
 
 #### 2️⃣ 配置环境
 
-```bash
+```powershell
 # 远程模式（OpenAI/DeepSeek API）
-export OPENAI_API_KEY="your-api-key"
-export OPENAI_API_BASE="https://api.deepseek.com"
+$env:OPENAI_API_KEY = "your-api-key"
+$env:OPENAI_API_BASE = "https://api.deepseek.com"
 
 # 本地模式（可选）
-export MODEL_PATH="/path/to/model"
+$env:MODEL_PATH = "C:\\path\\to\\model"
 ```
 
 #### 3️⃣ 基础用法
 
 ```python
-from aimo3_eval import CFG, AIMO3Solver, DataLoader, EvalRunner
+from aimo3_eval import CFG, CoTSolver, TIRSolver, DataLoader, EvalRunner
 
 # 配置
 cfg = CFG(
@@ -263,8 +269,8 @@ cfg = CFG(
     workers=4      # 并行 Worker 数
 )
 
-# 加载数据
-df = DataLoader.load_csv("data/reference.csv")
+# 加载数据（若原列为 answer，会自动映射为 ground_truth）
+df = DataLoader.load_csv("data/reference.csv", id_col="id", problem_col="problem", ground_truth_col="answer")
 # 或自定义数据集：
 # df = DataLoader.load_custom_data(
 #     problems=["2+2等于多少？"],
@@ -272,8 +278,9 @@ df = DataLoader.load_csv("data/reference.csv")
 #     ground_truths=["4"]
 # )
 
-# 求解并评估
-solver = AIMO3Solver(cfg)
+# 求解并评估（二选一）
+solver = TIRSolver(cfg)
+# solver = CoTSolver(cfg)
 runner = EvalRunner(cfg, solver)
 results = runner.load_data(df).run()
 ```

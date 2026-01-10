@@ -1,5 +1,6 @@
 import os
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, fields
 
 @dataclass
 class CFG:
@@ -46,3 +47,34 @@ class CFG:
     
     # --- Paths ---
     output_dir: str = "./outputs"
+    
+    @classmethod
+    def from_json(cls, path: str, api_key: str | None = None) -> "CFG":
+        """
+        从 JSON 文件加载配置。
+        
+        Args:
+            path: config.json 文件路径
+            api_key: API Key（remote 模式必须提供，因为保存的配置中 API Key 已被隐藏）
+            
+        Returns:
+            CFG 实例
+        """
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        # 只保留 CFG 中定义的字段，忽略多余字段
+        valid_fields = {f.name for f in fields(cls)}
+        filtered_data = {k: v for k, v in data.items() if k in valid_fields}
+        
+        # 处理 remote 模式下的 API Key
+        if filtered_data.get('mode') == 'remote':
+            if api_key:
+                filtered_data['remote_api_key'] = api_key
+            elif filtered_data.get('remote_api_key') in ('***', '', None):
+                raise ValueError(
+                    "Remote 模式需要提供 API Key。"
+                    "请使用 CFG.from_json(path, api_key='your-api-key') 传入 API Key。"
+                )
+        
+        return cls(**filtered_data)
