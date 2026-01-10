@@ -64,7 +64,7 @@ class AIMO3Solver:
         print(f"🔧 Initializing {self.cfg.workers} sandboxes...")
         with ThreadPoolExecutor(max_workers=self.cfg.workers) as exe:
             # 传递 timeout 参数
-            futures = [exe.submit(AIMO3Sandbox, timeout=10.0) for _ in range(self.cfg.workers)]
+            futures = [exe.submit(AIMO3Sandbox, timeout=30) for _ in range(self.cfg.workers)]
             for f in as_completed(futures):
                 self.sandbox_pool.put(f.result())
         print("✅ Sandboxes ready.")
@@ -95,18 +95,27 @@ class AIMO3Solver:
         else:
             final_consensus = None
 
+        # 计算所有 attempts 的时间统计
+        attempt_times = [a['time_taken'] for a in attempts_data]
+        min_time = min(attempt_times) if attempt_times else 0
+        max_time = max(attempt_times) if attempt_times else 0
+        avg_time = sum(attempt_times) / len(attempt_times) if attempt_times else 0
+
         return {
             "id": problem_id,
             "problem": problem,
             "final_answer": final_consensus,
             "attempts": attempts_data,  # 保存完整轨迹供复盘
-            "time_taken": time.time() - start_time
+            "min_attempt_time": min_time,  # 最短 attempt 时间
+            "max_attempt_time": max_time,  # 最长 attempt 时间
+            "avg_attempt_time": avg_time   # 平均 attempt 时间
         }
 
     def _run_single_attempt(self, problem: str, attempt_idx: int) -> Dict[str, Any]:
         """
         Core Logic: 单次 TIR (Tool-Integrated Reasoning) 循环
         """
+        attempt_start_time = time.time()  # 记录 attempt 开始时间
         sandbox = self.sandbox_pool.get() # 从池中获取沙箱
         
         messages = [
@@ -116,6 +125,11 @@ class AIMO3Solver:
         
         final_answer = None
         turn_count = 0
+        
+        # 统计信息
+        python_calls = 0
+        python_errors = 0
+        total_tokens = 0
         
         try:
             # --- The Main Loop ---
@@ -136,17 +150,24 @@ class AIMO3Solver:
                         # stop=["<|im_end|>"] # 如果需要可以取消注释
                     )
                     message = response.choices[0].message
+                    
+                    # 累加 tokens
+                    if hasattr(response, 'usage') and response.usage:
+                        total_tokens += response.usage.total_tokens
+                        
                 except Exception as e:
                     messages.append({"role": "system", "content": f"Error: {str(e)}"})
                     break
 
-                # 2. 将模型的回复加入历史 (注意：这里加入的是 OpenAI 对象)
-                messages.append(message)
+                # 2. 将模型的回复加入历史，转为纯字典，避免下次请求携带 SDK 对象
+                messages.append(self._normalize_message(message))
 
                 # 3. 检查是否有工具调用 (Tool Calls)
                 if message.tool_calls:
                     for tool_call in message.tool_calls:
                         if tool_call.function.name == "python_interpreter":
+                            python_calls += 1  # 记录 Python 调用次数
+                            
                             # A. 解析代码
                             try:
                                 arguments = json.loads(tool_call.function.arguments)
@@ -154,6 +175,7 @@ class AIMO3Solver:
                             except json.JSONDecodeError:
                                 code = ""
                                 output = "Error: Invalid JSON format in tool arguments."
+                                python_errors += 1
 
                             # B. 沙箱执行
                             if code:
@@ -163,8 +185,10 @@ class AIMO3Solver:
                                         output = output[:2000] + "\n...[Output Truncated]"
                                 except Exception as e:
                                     output = f"Execution Error: {str(e)}"
+                                    python_errors += 1  # 记录执行错误
                             else:
                                 output = "Error: No code provided."
+                                python_errors += 1
 
                             # C. 将结果追加回消息列表 (Role: Tool)
                             messages.append({
@@ -211,7 +235,11 @@ class AIMO3Solver:
         return {
             "attempt_id": attempt_idx,
             "final_answer": final_answer,
-            "messages": clean_messages  # <--- 返回清洗后的字典列表
+            "messages": clean_messages,  # <--- 返回清洗后的字典列表
+            "time_taken": time.time() - attempt_start_time,  # 记录该 attempt 的耗时
+            "python_calls": python_calls,  # Python 调用次数
+            "python_errors": python_errors,  # Python 错误次数
+            "total_tokens": total_tokens  # 总 token 使用量
         }
 
     def _extract_boxed_content(self, text: str) -> Optional[str]:
@@ -222,6 +250,19 @@ class AIMO3Solver:
         if matches:
             return matches[-1]
         return None
+
+    def _normalize_message(self, msg: Any) -> Dict[str, Any]:
+        """确保消息为纯 dict，避免 ChatCompletionMessage 等 SDK 对象在下一轮调用出错"""
+        if hasattr(msg, "model_dump"):
+            return msg.model_dump()
+        if hasattr(msg, "to_dict"):
+            return msg.to_dict()
+        if isinstance(msg, dict):
+            return msg
+        try:
+            return dict(msg)
+        except Exception:
+            return {"role": "unknown", "content": str(msg)}
 
     def cleanup(self):
         """Shut down sandboxes"""

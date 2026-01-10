@@ -22,15 +22,15 @@ class CFG:
     temperature: float = 0.7  # 稍微降低一点，提高 pass@1 稳定性，maj@k 时可调高
     top_p: float = 0.95
     max_tokens: int = 16384    # 单次生成的最大长度
-    max_turns: int = 15
+    max_turns: int = 50
     
     # --- Server Config ---
     port: int = 8000
     server_timeout: int = 300 # 等待 vLLM 启动的秒数
     
     # --- Tree Search / Solver Config ---
-    attempts: int = 8         # 每个问题尝试多少次 (Maj@k 的 k)
-    workers: int = 16         # 并发 Worker 数
+    attempts: int = 8       # 每个问题尝试多少次 (Maj@k 的 k)
+    workers: int = 8       # 并发 Worker 数
     timeout_per_problem: int = 300
     
     # --- Prompts ---
