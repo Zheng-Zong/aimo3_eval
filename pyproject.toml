@@ -1,6 +1,6 @@
 [project]
 name = "aimo3-eval"
-version = "0.1.3"
+version = "0.1.4"
 description = "A lightweight evaluation framework for the Kaggle AIMO3 competition, supporting both local and remote model inference modes."
 readme = "README.md"
 requires-python = ">=3.11"

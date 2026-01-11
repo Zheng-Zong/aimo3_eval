@@ -29,6 +29,19 @@ class VLLMServer:
         if self.cfg.max_model_len is not None:
             cmd.extend(['--max-model-len', str(self.cfg.max_model_len)])
         
+        # 添加额外的 vLLM server 启动参数
+        if self.cfg.vllm_server_kwargs:
+            for key, value in self.cfg.vllm_server_kwargs.items():
+                # 将下划线转为连字符（Python风格 -> CLI风格）
+                cli_key = f'--{key.replace("_", "-")}'
+                if isinstance(value, bool):
+                    # 布尔值：True 时添加标志，False 时跳过
+                    if value:
+                        cmd.append(cli_key)
+                else:
+                    # 其他类型：添加键值对
+                    cmd.extend([cli_key, str(value)])
+        
         os.makedirs(self.cfg.output_dir, exist_ok=True)
         self.log_file = open(os.path.join(self.cfg.output_dir, 'vllm_server.log'), 'w')
         

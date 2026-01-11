@@ -32,7 +32,7 @@ class CFG:
     
     # --- Tree Search / Solver Config ---
     attempts: int = 8       # 每个问题尝试多少次 (Maj@k 的 k)
-    workers: int = 8       # 并发 Worker 数
+    workers: int = 16       # 并发 Worker 数
     timeout_per_problem: int = 300
     
     # --- Prompts ---
@@ -49,6 +49,10 @@ class CFG:
     # --- Paths ---
     output_dir: str = "./outputs"
     
+    # --- Extra Kwargs ---
+    vllm_server_kwargs: dict | None = None  # 传递给 vLLM 启动的额外参数
+    inference_kwargs: dict | None = None    # 传递给推理 API 的额外参数
+    
     @classmethod
     def from_json(cls, path: str, api_key: str | None = None) -> "CFG":
         """
@@ -64,9 +68,16 @@ class CFG:
         with open(path, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
-        # 只保留 CFG 中定义的字段，忽略多余字段
+        # 分离 CFG 预定义字段和额外的 kwargs
         valid_fields = {f.name for f in fields(cls)}
         filtered_data = {k: v for k, v in data.items() if k in valid_fields}
+        extra_kwargs = {k: v for k, v in data.items() if k not in valid_fields}
+        
+        # 如果 JSON 中没有显式定义 vllm_server_kwargs 和 inference_kwargs，
+        # 将所有额外参数作为 inference_kwargs
+        if 'vllm_server_kwargs' not in filtered_data and 'inference_kwargs' not in filtered_data:
+            if extra_kwargs:
+                filtered_data['inference_kwargs'] = extra_kwargs
         
         # 处理 remote 模式下的 API Key
         if filtered_data.get('mode') == 'remote':

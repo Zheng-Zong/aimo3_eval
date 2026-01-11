@@ -150,6 +150,10 @@ class TIRSolver:
                     if self.cfg.max_tokens is not None:
                         completion_kwargs['max_tokens'] = self.cfg.max_tokens
                     
+                    # 添加额外的推理参数
+                    if self.cfg.inference_kwargs:
+                        completion_kwargs.update(self.cfg.inference_kwargs)
+                    
                     response = self.client.chat.completions.create(**completion_kwargs)
                     message = response.choices[0].message
                     
@@ -371,6 +375,10 @@ class CoTSolver:
             }
             if self.cfg.max_tokens is not None:
                 completion_kwargs['max_tokens'] = self.cfg.max_tokens
+
+            # 追加额外推理参数（与 TIRSolver 行为一致）
+            if self.cfg.inference_kwargs:
+                completion_kwargs.update(self.cfg.inference_kwargs)
             
             response = self.client.chat.completions.create(**completion_kwargs)
             message = response.choices[0].message
