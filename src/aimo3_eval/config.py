@@ -18,11 +18,12 @@ class CFG:
     served_model_name: str = 'gpt-oss' # 本地服务的名字
     gpu_memory_utilization: float = 0.90
     tensor_parallel_size: int = 1  # 注意：大模型本地跑可能需要调整
+    max_model_len: int | None = None
     
     # --- Inference Config ---
     temperature: float = 0.7  # 稍微降低一点，提高 pass@1 稳定性，maj@k 时可调高
     top_p: float = 0.95
-    max_tokens: int = 16384    # 单次生成的最大长度
+    max_tokens: int | None = None    # 单次生成的最大长度，None 表示使用模型默认值
     max_turns: int = 50
     
     # --- Server Config ---

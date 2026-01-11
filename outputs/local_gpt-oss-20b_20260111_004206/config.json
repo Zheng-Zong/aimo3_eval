@@ -1,0 +1,23 @@
+{
+  "mode": "local",
+  "remote_base_url": "https://api.deepseek.com",
+  "remote_api_key": "***",
+  "remote_model_name": "deepseek-reasoner",
+  "model_path": "/kaggle/input/gpt-oss-20b/transformers/default/1",
+  "served_model_name": "gpt-oss-20b",
+  "gpu_memory_utilization": 0.96,
+  "tensor_parallel_size": 1,
+  "temperature": 0.7,
+  "top_p": 0.95,
+  "max_tokens": 32768,
+  "max_turns": 50,
+  "port": 8000,
+  "server_timeout": 300,
+  "attempts": 8,
+  "workers": 16,
+  "timeout_per_problem": 300,
+  "system_prompt": "You are a world-class International Mathematical Olympiad (IMO) competitor. The final answer must be a non-negative integer between 0 and 99999. You must place the final integer answer inside \\boxed{}.",
+  "tool_prompt": "Use this tool to execute Python code. You must use print() to output results.",
+  "output_dir": "/kaggle/working/outputs",
+  "solver": "CoTSolver"
+}

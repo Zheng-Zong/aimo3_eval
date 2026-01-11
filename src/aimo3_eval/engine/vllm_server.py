@@ -26,6 +26,9 @@ class VLLMServer:
             '--disable-log-requests' # 减少日志干扰
         ]
         
+        if self.cfg.max_model_len is not None:
+            cmd.extend(['--max-model-len', str(self.cfg.max_model_len)])
+        
         os.makedirs(self.cfg.output_dir, exist_ok=True)
         self.log_file = open(os.path.join(self.cfg.output_dir, 'vllm_server.log'), 'w')
         

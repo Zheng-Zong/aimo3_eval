@@ -141,14 +141,16 @@ class TIRSolver:
                 
                 # 1. 调用 LLM
                 try:
-                    response = self.client.chat.completions.create(
-                        model=self.target_model,
-                        messages=messages,
-                        tools=PYTHON_TOOL,
-                        temperature=self.cfg.temperature,
-                        max_tokens=self.cfg.max_tokens,
-                        # stop=["<|im_end|>"] # 如果需要可以取消注释
-                    )
+                    completion_kwargs = {
+                        'model': self.target_model,
+                        'messages': messages,
+                        'tools': PYTHON_TOOL,
+                        'temperature': self.cfg.temperature,
+                    }
+                    if self.cfg.max_tokens is not None:
+                        completion_kwargs['max_tokens'] = self.cfg.max_tokens
+                    
+                    response = self.client.chat.completions.create(**completion_kwargs)
                     message = response.choices[0].message
                     
                     # 累加 tokens
@@ -362,12 +364,15 @@ class CoTSolver:
         
         try:
             # 单次 LLM 调用，不使用工具
-            response = self.client.chat.completions.create(
-                model=self.target_model,
-                messages=messages,
-                temperature=self.cfg.temperature,
-                max_tokens=self.cfg.max_tokens,
-            )
+            completion_kwargs = {
+                'model': self.target_model,
+                'messages': messages,
+                'temperature': self.cfg.temperature,
+            }
+            if self.cfg.max_tokens is not None:
+                completion_kwargs['max_tokens'] = self.cfg.max_tokens
+            
+            response = self.client.chat.completions.create(**completion_kwargs)
             message = response.choices[0].message
             
             # 累加 tokens
