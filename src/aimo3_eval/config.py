@@ -63,7 +63,6 @@ class PromptConfig:
 class HarmonyConfig:
     """Harmony 专用配置（仅 HarmonyTIRSolver 使用）"""
     # encoding: str = "HARMONY_GPT_OSS"
-    context_tokens: int = 65536
     search_tokens: int = 1024
     buffer_tokens: int = 512
     min_p: float = 0.02

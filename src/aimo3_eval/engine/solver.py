@@ -606,7 +606,7 @@ class HarmonyTIRSolver:
         self.template = HarmonyTemplate()
         
         # Harmony 特定配置
-        self.context_tokens = self.cfg.harmony.context_tokens
+        self.context_tokens = self.cfg.local.max_model_len if self.cfg.local.max_model_len else 65536
         self.search_tokens = self.cfg.harmony.search_tokens
         self.buffer_tokens = self.cfg.harmony.buffer_tokens
         self.min_p = self.cfg.harmony.min_p
