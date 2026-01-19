@@ -1,12 +1,13 @@
 [project]
 name = "aimo3-eval"
-version = "0.1.4"
+version = "0.1.5"
 description = "A lightweight evaluation framework for the Kaggle AIMO3 competition, supporting both local and remote model inference modes."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "jupyter>=1.1.1",
     "openai>=2.14.0",
+    "openai-harmony>=0.0.8",
     "polars>=1.36.1",
     "sympy>=1.14.0",
 ]

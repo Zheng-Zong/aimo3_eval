@@ -34,7 +34,56 @@ class SolverProtocol(Protocol):
 
 
 class ResultRecorder:
-    """结果记录器，负责保存和管理评估结果"""
+    """结果记录器，负责保存和管理评估    改进前（问题）：
+    - 单一 CFG 类，包含所有参数
+    - asdict() 直接输出所有字段
+    
+    改进后（清晰）：
+    - 分离配置：BaseConfig + RemoteConfig / LocalConfig
+    - 只输出当前模式需要的参数
+    - 添加模式验证和文档    改进前（问题）：
+    - 单一 CFG 类，包含所有参数
+    - asdict() 直接输出所有字段
+    
+    改进后（清晰）：
+    - 分离配置：BaseConfig + RemoteConfig / LocalConfig
+    - 只输出当前模式需要的参数
+    - 添加模式验证和文档    改进前（问题）：
+    - 单一 CFG 类，包含所有参数
+    - asdict() 直接输出所有字段
+    
+    改进后（清晰）：
+    - 分离配置：BaseConfig + RemoteConfig / LocalConfig
+    - 只输出当前模式需要的参数
+    - 添加模式验证和文档    改进前（问题）：
+    - 单一 CFG 类，包含所有参数
+    - asdict() 直接输出所有字段
+    
+    改进后（清晰）：
+    - 分离配置：BaseConfig + RemoteConfig / LocalConfig
+    - 只输出当前模式需要的参数
+    - 添加模式验证和文档    改进前（问题）：
+    - 单一 CFG 类，包含所有参数
+    - asdict() 直接输出所有字段
+    
+    改进后（清晰）：
+    - 分离配置：BaseConfig + RemoteConfig / LocalConfig
+    - 只输出当前模式需要的参数
+    - 添加模式验证和文档    改进前（问题）：
+    - 单一 CFG 类，包含所有参数
+    - asdict() 直接输出所有字段
+    
+    改进后（清晰）：
+    - 分离配置：BaseConfig + RemoteConfig / LocalConfig
+    - 只输出当前模式需要的参数
+    - 添加模式验证和文档    改进前（问题）：
+    - 单一 CFG 类，包含所有参数
+    - asdict() 直接输出所有字段
+    
+    改进后（清晰）：
+    - 分离配置：BaseConfig + RemoteConfig / LocalConfig
+    - 只输出当前模式需要的参数
+    - 添加模式验证和文档结果"""
     
     # 核心字段（必须存在）
     CORE_ATTEMPT_FIELDS = {'attempt_id', 'final_answer', 'messages', 'time_taken'}
@@ -143,7 +192,7 @@ class EvalRunner:
     
     Example:
         ```python
-        cfg = CFG(mode='remote', remote_api_key='sk-xxx')
+        cfg = CFG(mode='remote', remote=RemoteConfig(api_key='sk-xxx'))
         solver = AIMO3Solver(cfg)
         
         runner = EvalRunner(cfg, solver)
@@ -176,7 +225,7 @@ class EvalRunner:
         # 构建输出目录
         if run_name is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            model_name = cfg.remote_model_name if cfg.mode == 'remote' else cfg.served_model_name
+            model_name = cfg.remote.model if cfg.mode == 'remote' else cfg.local.served_model_name
             model_name_clean = model_name.replace('/', '_').replace(':', '_')
             run_name = f"{cfg.mode}_{model_name_clean}_{timestamp}"
         
@@ -186,14 +235,8 @@ class EvalRunner:
         # 保存配置参数（在运行开始时保存，即使中断也能保留配置）
         # 过滤敏感字段（如 API Key）
         self.config_path = os.path.join(self.output_dir, "config.json")
-        from dataclasses import asdict
-        config_data = asdict(cfg)
-        sensitive_fields = {'remote_api_key', 'api_key', 'secret', 'password', 'token'}
-        for field in sensitive_fields:
-            if field in config_data:
-                config_data[field] = "***"
-        # 添加 solver 类型信息
-        config_data['solver'] = type(solver).__name__
+        self.cfg.solver.solver_type = type(solver).__name__
+        config_data = cfg.to_dict()
         with open(self.config_path, 'w', encoding='utf-8') as f:
             json.dump(config_data, f, indent=2, ensure_ascii=False)
         

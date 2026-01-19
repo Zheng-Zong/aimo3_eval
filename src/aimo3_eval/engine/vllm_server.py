@@ -13,25 +13,25 @@ class VLLMServer:
 
     def start(self):
         """启动 vLLM 服务"""
-        print(f"🚀 Starting vLLM server on port {self.cfg.port}...")
+        print(f"🚀 Starting vLLM server on port {self.cfg.local.port}...")
         
         cmd = [
             sys.executable, '-m', 'vllm.entrypoints.openai.api_server',
-            '--model', self.cfg.model_path,
-            '--served-model-name', self.cfg.served_model_name,
-            '--tensor-parallel-size', str(self.cfg.tensor_parallel_size),
-            '--gpu-memory-utilization', str(self.cfg.gpu_memory_utilization),
-            '--port', str(self.cfg.port),
+            '--model', self.cfg.local.model_path,
+            '--served-model-name', self.cfg.local.served_model_name,
+            '--tensor-parallel-size', str(self.cfg.local.tensor_parallel_size),
+            '--gpu-memory-utilization', str(self.cfg.local.gpu_memory_utilization),
+            '--port', str(self.cfg.local.port),
             '--trust-remote-code',
             '--disable-log-requests' # 减少日志干扰
         ]
         
-        if self.cfg.max_model_len is not None:
-            cmd.extend(['--max-model-len', str(self.cfg.max_model_len)])
+        if self.cfg.local.max_model_len is not None:
+            cmd.extend(['--max-model-len', str(self.cfg.local.max_model_len)])
         
         # 添加额外的 vLLM server 启动参数
-        if self.cfg.vllm_server_kwargs:
-            for key, value in self.cfg.vllm_server_kwargs.items():
+        if self.cfg.local.vllm_server_kwargs:
+            for key, value in self.cfg.local.vllm_server_kwargs.items():
                 # 将下划线转为连字符（Python风格 -> CLI风格）
                 cli_key = f'--{key.replace("_", "-")}'
                 if isinstance(value, bool):
@@ -55,11 +55,11 @@ class VLLMServer:
         self._wait_for_ready()
 
     def _wait_for_ready(self):
-        base_url = f"http://localhost:{self.cfg.port}/v1/models"
+        base_url = f"http://localhost:{self.cfg.local.port}/v1/models"
         start_time = time.time()
         
         while True:
-            if time.time() - start_time > self.cfg.server_timeout:
+            if time.time() - start_time > self.cfg.local.server_timeout:
                 self.stop()
                 raise TimeoutError("vLLM Server start timeout")
                 
