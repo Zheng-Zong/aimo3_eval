@@ -825,29 +825,54 @@ class HarmonyTIRSolver:
         clean_messages = []
         for msg in conversation.messages:
             try:
-                if hasattr(msg, 'model_dump'):
-                    clean_messages.append(msg.model_dump())
-                elif hasattr(msg, 'to_dict'):
-                    clean_messages.append(msg.to_dict())
-                else:
-                    # 手动构建字典
-                    content_text = ""
-                    if hasattr(msg, 'content') and msg.content:
-                        if hasattr(msg.content[0], 'text'):
-                            content_text = msg.content[0].text
+                # 提取角色信息
+                role = "unknown"
+                if hasattr(msg, 'author') and hasattr(msg.author, 'role'):
+                    role = msg.author.role.value if hasattr(msg.author.role, 'value') else str(msg.author.role)
+                
+                # 提取内容文本
+                content_text = ""
+                if hasattr(msg, 'content') and msg.content:
+                    # content 是一个列表，需要遍历提取
+                    content_parts = []
+                    for content_item in msg.content:
+                        if hasattr(content_item, 'text'):
+                            content_parts.append(content_item.text)
+                        elif hasattr(content_item, 'model_dump'):
+                            # 如果是 Pydantic 对象，尝试序列化
+                            dumped = content_item.model_dump()
+                            if 'text' in dumped:
+                                content_parts.append(dumped['text'])
+                            else:
+                                content_parts.append(str(dumped))
                         else:
-                            content_text = str(msg.content)
-                    
-                    role = "unknown"
-                    if hasattr(msg, 'author') and hasattr(msg.author, 'role'):
-                        role = str(msg.author.role.value) if hasattr(msg.author.role, 'value') else str(msg.author.role)
-                    
-                    clean_messages.append({
-                        "role": role,
-                        "content": content_text
-                    })
-            except Exception:
-                clean_messages.append({"role": "unknown", "content": str(msg)})
+                            content_parts.append(str(content_item))
+                    content_text = '\n'.join(content_parts) if content_parts else ""
+                
+                # 提取其他元信息
+                message_dict = {
+                    "role": role,
+                    "content": content_text
+                }
+                
+                # 添加可选字段
+                if hasattr(msg, 'channel') and msg.channel:
+                    message_dict["channel"] = msg.channel
+                if hasattr(msg, 'recipient') and msg.recipient:
+                    message_dict["recipient"] = msg.recipient
+                if hasattr(msg, 'author') and hasattr(msg.author, 'name') and msg.author.name:
+                    message_dict["name"] = msg.author.name
+                
+                clean_messages.append(message_dict)
+                
+            except Exception as e:
+                # 发生错误时，至少记录一些基本信息
+                clean_messages.append({
+                    "role": "unknown", 
+                    "content": f"[Error serializing message: {str(e)}]",
+                    "raw": str(msg)[:200]  # 只保留前200个字符
+                })
+        
         return clean_messages
 
     def cleanup(self):

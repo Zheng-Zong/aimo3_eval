@@ -346,10 +346,11 @@ class EvalRunner:
                 )
                 
                 # 保存 metrics.json（仅包含最终指标）
+                k = self.cfg.solver.attempts
                 metrics_json = {
                     "Pass@1": metrics['acc_pass@1'],
-                    "Pass@k": metrics['acc_pass@k'],
-                    "Maj@k": metrics['acc_maj@k']
+                    f"Pass@{k}": metrics['acc_pass@k'],
+                    f"Maj@{k}": metrics['acc_maj@k']
                 }
                 metrics_path = os.path.join(self.output_dir, "metrics.json")
                 with open(metrics_path, 'w', encoding='utf-8') as f:
