@@ -600,7 +600,7 @@ class HarmonyTIRSolver:
         )
         
         # 初始化 Harmony 编码和模板
-        encoding_name = "HARMONY_GPT_OSS"
+        encoding_name = HarmonyEncodingName.HARMONY_GPT_OSS
         self.encoding = load_harmony_encoding(encoding_name)
         self.stop_token_ids = self.encoding.stop_tokens_for_assistant_actions()
         self.template = HarmonyTemplate()
